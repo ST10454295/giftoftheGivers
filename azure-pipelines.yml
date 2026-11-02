@@ -1,0 +1,49 @@
+trigger:
+  - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  - group: sql-secrets # This pulls the password from Azure DevOps Library
+
+steps:
+  # 1. ADD FIREWALL RULE (Allows the DevOps agent to connect to Azure SQL)
+  - task: AzurePowerShell@5
+    displayName: 'Add SQL Firewall Rule'
+    inputs:
+      azureSubscription: '<YOUR-AZURE-SERVICE-CONNECTION-NAME>' 
+      ScriptType: 'InlineScript'
+      Inline: |
+        $agentIP = (Invoke-RestMethod -Uri "https://api.ipify.org")
+        New-AzSqlServerFirewallRule -ResourceGroupName "<YOUR-RESOURCE-GROUP>" `
+          -ServerName "<YOUR-SQL-SERVER-NAME>" `
+          -FirewallRuleName "AzureDevOpsAgent" `
+          -StartIPAddress $agentIP -EndIPAddress $agentIP
+      azurePowerShellVersion: 'LatestVersion'
+
+  # 2. DEPLOY THE SQL SCRIPT
+  - task: SqlAzureDacpacDeployment@1
+    displayName: 'Deploy Schema Update (C3)'
+    inputs:
+      azureSubscription: '<YOUR-AZURE-SERVICE-CONNECTION-NAME>'
+      AuthenticationType: 'server'
+      ServerName: '<YOUR-SQL-SERVER-NAME>.database.windows.net'
+      DatabaseName: 'GOTG_Final' 
+      SqlUsername: '<YOUR-SQL-ADMIN-USERNAME>'
+      SqlPassword: '$(SqlAdminPassword)'
+      deployType: 'SqlTask'
+      SqlFile: '$(Build.SourcesDirectory)/scripts/c3_Update.sql'
+
+  # 3. REMOVE FIREWALL RULE (Cleanup for security)
+  - task: AzurePowerShell@5
+    displayName: 'Remove SQL Firewall Rule'
+    condition: always() # Runs even if the deployment fails
+    inputs:
+      azureSubscription: '<YOUR-AZURE-SERVICE-CONNECTION-NAME>'
+      ScriptType: 'InlineScript'
+      Inline: |
+        Remove-AzSqlServerFirewallRule -ResourceGroupName "<YOUR-RESOURCE-GROUP>" `
+          -ServerName "<YOUR-SQL-SERVER-NAME>" `
+          -FirewallRuleName "AzureDevOpsAgent"
+      azurePowerShellVersion: 'LatestVersion'
