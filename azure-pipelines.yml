@@ -5,19 +5,19 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  - group: sql-secrets # This pulls the password from Azure DevOps Library
+  - group: sql-secrets
 
 steps:
   # 1. ADD FIREWALL RULE (Allows the DevOps agent to connect to Azure SQL)
   - task: AzurePowerShell@5
     displayName: 'Add SQL Firewall Rule'
     inputs:
-      azureSubscription: '<YOUR-AZURE-SERVICE-CONNECTION-NAME>' 
+      azureSubscription: 'MY-AZURE-DB-CONNECTION' 
       ScriptType: 'InlineScript'
       Inline: |
         $agentIP = (Invoke-RestMethod -Uri "https://api.ipify.org")
-        New-AzSqlServerFirewallRule -ResourceGroupName "<YOUR-RESOURCE-GROUP>" `
-          -ServerName "<YOUR-SQL-SERVER-NAME>" `
+        New-AzSqlServerFirewallRule -ResourceGroupName "GiftRG" `
+          -ServerName "gotg-server-st10454295" `
           -FirewallRuleName "AzureDevOpsAgent" `
           -StartIPAddress $agentIP -EndIPAddress $agentIP
       azurePowerShellVersion: 'LatestVersion'
@@ -26,11 +26,11 @@ steps:
   - task: SqlAzureDacpacDeployment@1
     displayName: 'Deploy Schema Update (C3)'
     inputs:
-      azureSubscription: '<YOUR-AZURE-SERVICE-CONNECTION-NAME>'
+      azureSubscription: 'MY-AZURE-DB-CONNECTION'
       AuthenticationType: 'server'
-      ServerName: '<YOUR-SQL-SERVER-NAME>.database.windows.net'
+      ServerName: 'gotg-server-st10454295.database.windows.net'
       DatabaseName: 'GOTG_Final' 
-      SqlUsername: '<YOUR-SQL-ADMIN-USERNAME>'
+      SqlUsername: 'sqladmin'
       SqlPassword: '$(SqlAdminPassword)'
       deployType: 'SqlTask'
       SqlFile: '$(Build.SourcesDirectory)/scripts/c3_Update.sql'
@@ -38,12 +38,12 @@ steps:
   # 3. REMOVE FIREWALL RULE (Cleanup for security)
   - task: AzurePowerShell@5
     displayName: 'Remove SQL Firewall Rule'
-    condition: always() # Runs even if the deployment fails
+    condition: always() 
     inputs:
-      azureSubscription: '<YOUR-AZURE-SERVICE-CONNECTION-NAME>'
+      azureSubscription: 'MY-AZURE-DB-CONNECTION'
       ScriptType: 'InlineScript'
       Inline: |
-        Remove-AzSqlServerFirewallRule -ResourceGroupName "<YOUR-RESOURCE-GROUP>" `
-          -ServerName "<YOUR-SQL-SERVER-NAME>" `
+        Remove-AzSqlServerFirewallRule -ResourceGroupName "GiftRG" `
+          -ServerName "gotg-server-st10454295" `
           -FirewallRuleName "AzureDevOpsAgent"
       azurePowerShellVersion: 'LatestVersion'
