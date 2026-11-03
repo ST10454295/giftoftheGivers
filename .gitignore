@@ -1,4 +1,6 @@
 .vs/
-*.vsidx
-*.suo
-*.user 
+**/bin/
+**/obj/
+**/local.settings.json
+TestResults/
+artifacts/
